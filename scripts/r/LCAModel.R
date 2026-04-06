@@ -5,6 +5,7 @@ library(tidyverse)
 library(tidyplots)
 library(patchwork)
 library(poLCA)
+#libary(poLCAParallel)
 #library(rjags)
 
 ## Load files
@@ -200,8 +201,11 @@ data$Education <- as_factor(data$Education)
 data <- data[-1, ]
 data <- data[-133, ]
 # Set eval to minimum 1 instead of 0
-data <- data %>%
-  mutate(across(43:52, ~ if_else(is.na(.), NA_integer_, . + 1)))
+#data <- data %>%
+  #mutate(across(43:52, ~ if_else(is.na(.), NA_integer_, . + 1)))
+cols <- c("EVALcgm","EVALcgw","EVALtgm","EVALtgw","EVALnb","EVALhet","EVALgl","EVALbi","EVALpan","EVALace") 
+data <- data |>
+  mutate(across(all_of(cols), ~ pmax(1, ceiling(.x/10))))
 # Integer conversion
 data <- data %>%
   mutate(across(33:72, ~ as.integer(as.character(.))))
@@ -223,12 +227,15 @@ data$TG_STAB_Total <- with(data, rowSums(cbind(8 - STAB1tgm, 8 - STAB1tgw, STAB2
 data$TGNB_STAB_Total <- with(data, rowSums(cbind(8 - STAB1tgm, 8 - STAB1tgw, 8- STAB1nb, STAB2tgm, STAB2tgw, STAB2nb)))
 data$SHOM_STAB_Total <- with(data, rowSums(cbind(8 - STAB1gl, 8- STAB1bi,STAB2gl,STAB2bi)))
 data$SOTH_STAB_Total <- with(data, rowSums(cbind(8 - STAB1pan, 8- STAB1ace,STAB2pan,STAB2ace)))
-
 # Create data1 variable
 data1 <- data |>
   filter(Study == 1)
+data1 <- data |>
+  filter(Study == 2)
 
-# Models
+################################################################################
+############################# Study 1 models ###################################
+################################################################################
 sink(file = "models_1-4_diagnostic.txt")
 ModelNum <- 1
 while(ModelNum < 5){
@@ -239,10 +246,11 @@ while(ModelNum < 5){
   if (ModelNum == 1) {
     f <- cbind(REALcgm,REALcgw,REALnb,REALhet,REALgl,REALbi,EVALcgm,EVALcgw,EVALnb,EVALhet,EVALgl,EVALbi,STAB1cgm,STAB1cgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB2cgm,STAB2cgw,STAB2nb,STAB2het,STAB2gl,STAB2bi)~1
     cat("INDIVIDUAL MODEL WITHOUT COVARIATES:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCA(f, data1, nclass=i, maxiter=3000, 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
                   tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=TRUE)
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
       if(lc$bic < min_bic){
         min_bic <- lc$bic
         LCA_best_model<-lc
@@ -256,10 +264,11 @@ while(ModelNum < 5){
                STAB1cgm,STAB1cgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,
                STAB2cgm,STAB2cgw,STAB2nb,STAB2het,STAB2gl,STAB2bi)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
     cat("INDIVIDUAL MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCA(f, data1, nclass=i, maxiter=3000, 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
                   tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=TRUE)
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
       if(lc$bic < min_bic){
         min_bic <- lc$bic
         LCA_best_model<-lc
@@ -272,10 +281,11 @@ while(ModelNum < 5){
                CG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,
                CG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total)~1    
     cat("PARCELED MODEL WITHOUT COVARIATES:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCA(f, data1, nclass=i, maxiter=3000, 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
                   tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=TRUE)
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
       if(lc$bic < min_bic){
         min_bic <- lc$bic
         LCA_best_model<-lc
@@ -288,10 +298,11 @@ while(ModelNum < 5){
                CG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,
                CG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
     cat("PARCELED MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCA(f, data1, nclass=i, maxiter=3000, 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
                   tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=TRUE)
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
       if(lc$bic < min_bic){
         min_bic <- lc$bic
         LCA_best_model<-lc
@@ -309,6 +320,329 @@ Model2Best
 Model3Best
 Model4Best
 sink(file = NULL)
+
+
+################################################################################
+####################### Study 1 Nocishetero models #############################
+################################################################################
+sink(file = "models_5-8_diagnostic.txt")
+while(ModelNum < 9){
+  cat("CURRENT MODEL IS:", ModelNum, "\n") 
+  cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+  max_II <- -100000
+  min_bic <- 100000
+  if (ModelNum == 5) {
+    f <- cbind(REALnb,REALgl,REALbi,EVALnb,EVALgl,EVALbi,STAB1nb,,STAB1gl,STAB1bi,STAB2nb,STAB2gl,STAB2bi)~1
+    cat("INDIVIDUAL MODEL WITHOUT COVARIATES NO CISHET:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model5Best <- LCA_best_model
+  }
+  if (ModelNum == 6) {
+    f <- cbind(REALnb,REALgl,REALbi,
+               EVALnb,EVALgl,EVALbi,
+               STAB1nb,STAB1gl,STAB1bi,
+               STAB2nb,STAB2gl,STAB2bi)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("INDIVIDUAL MODEL WITH COVARIATES NO CISHET:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model6Best <- LCA_best_model
+  }
+  if (ModelNum == 7) {
+    f <- cbind(REALnb,SHOM_Real_Total,
+               EVALnb,SHOM_EVAL_Total,
+               STAB1nb,STAB2nb,SHOM_STAB_Total)~1    
+    cat("PARCELED MODEL WITHOUT COVARIATES NO CISHET:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model7Best <- LCA_best_model
+  }
+  if (ModelNum == 8) {
+    f <- cbind(REALnb,SHOM_Real_Total,
+               EVALnb,SHOM_EVAL_Total,
+               STAB1nb,STAB2nb,SHOM_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("PARCELED MODEL WITH COVARIATES NO CISHET:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model8Best <- LCA_best_model
+  }
+  ModelNum <- ModelNum + 1
+}
+sink(file = NULL)
+
+sink(file = "models_5-8_best_performance.txt")
+Model5Best
+Model6Best
+Model7Best
+Model8Best
+sink(file = NULL)
+
+################################################################################
+############################# Study 2  Models ##################################
+################################################################################
+sink(file = "models_9-20_diagnostic.txt")
+while(ModelNum < 21){
+  cat("CURRENT MODEL IS:", ModelNum, "\n") 
+  cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+  max_II <- -100000
+  min_bic <- 100000
+  if (ModelNum == 9) {
+    f <- cbind(REALcgm,REALcgw,REALtgm,REALtgw,REALnb,REALhet,REALgl,REALbi,REALpan,REALace,
+               EVALcgm,EVALcgw,EVALtgm,EVALtgw,EVALnb,EVALhet,EVALgl,EVALbi,EVALpan,EVALace,
+               STAB1cgm,STAB1cgw,STAB1tgm,STAB1tgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
+               STAB2cgm,STAB2cgw,STAB2tgm,STAB2tgw,STAB2nb,STAB2het,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~1
+    cat("STUDY 2 - INDIVIDUAL MODEL NO COVARIATES:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model9Best <- LCA_best_model
+  }
+  if (ModelNum == 10) {
+    f <- cbind(REALcgm,REALcgw,REALtgm,REALtgw,REALnb,REALhet,REALgl,REALbi,REALpan,REALace,
+               EVALcgm,EVALcgw,EVALtgm,EVALtgw,EVALnb,EVALhet,EVALgl,EVALbi,EVALpan,EVALace,
+               STAB1cgm,STAB1cgw,STAB1tgm,STAB1tgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
+               STAB2cgm,STAB2cgw,STAB2tgm,STAB2tgw,STAB2nb,STAB2het,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - INDIVIDUAL MODEL WITH COVARIATES:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model10Best <- LCA_best_model
+  }
+  if (ModelNum == 11) {
+    f <- cbind (CG_Real_Total,TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
+                CG_EVAL_Total,TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
+                CG_STAB_Total,TGNB_STAB_Total, SHOM_STAB_Total, SOTH_STAB_Total)~1
+    cat("STUDY 2 - PARCELED MODEL NO COVARIATES:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model11Best <- LCA_best_model
+  } 
+  if (ModelNum == 12) {
+    f <- cbind (CG_Real_Total,TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
+                CG_EVAL_Total,TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
+                CG_STAB_Total,TGNB_STAB_Total, SHOM_STAB_Total, SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model12Best <- LCA_best_model
+  } 
+  if (ModelNum == 13) {
+    f <- cbind(CG_Real_Total,TG_Real_Total,REALnb,REALhet,SHOM_Real_Total,SOTH_Real_Total,
+               CG_EVAL_Total,TG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,SOTH_EVAL_Total,
+               CG_STAB_Total,TG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total,SOTH_STAB_Total)~1
+    cat("STUDY 2 - PARCELED MODEL NO COVARIATES NB SEPARATE:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model13Best <- LCA_best_model
+  }
+  if (ModelNum == 14) {
+    f <- cbind(CG_Real_Total,TG_Real_Total,REALnb,REALhet,SHOM_Real_Total,SOTH_Real_Total,
+               CG_EVAL_Total,TG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,SOTH_EVAL_Total,
+               CG_STAB_Total,TG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES NB SEPARATE:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model14Best <- LCA_best_model
+  }
+  if (ModelNum == 15) {
+    f <- cbind(REALtgm,REALtgw,REALnb,REALgl,REALbi,REALpan,REALace,
+               EVALtgm,EVALtgw,EVALnb,EVALgl,EVALbi,EVALpan,EVALace,
+               STAB1tgm,STAB1tgw,STAB1nb,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
+               STAB2tgm,STAB2tgw,STAB2nb,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~1
+    cat("STUDY 2 - INDIVIDUAL MODEL NO COVARIATES OR CISHETERO:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model15Best <- LCA_best_model
+  } 
+  if (ModelNum == 16) {
+    f <- cbind(REALtgm,REALtgw,REALnb,REALgl,REALbi,REALpan,REALace,
+               EVALtgm,EVALtgw,EVALnb,EVALgl,EVALbi,EVALpan,EVALace,
+               STAB1tgm,STAB1tgw,STAB1nb,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
+               STAB2tgm,STAB2tgw,STAB2nb,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - INDIVIDUAL MODEL WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model16Best <- LCA_best_model
+  }
+  if (ModelNum == 17) {
+    f <- cbind (TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
+                TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
+                TGNB_STAB_Total,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - PARCELED MODEL NO COVARIATES OR CISHETERO:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model17Best <- LCA_best_model
+  } 
+  if (ModelNum == 18) {
+    f <- cbind (TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
+                TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
+                TGNB_STAB_Total,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
+    for(i in 2:5){
+      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model18Best <- LCA_best_model
+  } 
+  if (ModelNum == 19) {
+    f <- cbind(TG_Real_Total,REALnb,SHOM_Real_Total,SOTH_Real_Total,
+               TG_EVAL_Total,EVALnb,SHOM_EVAL_Total,SOTH_EVAL_Total,
+               TG_STAB_Total,STAB1nb,STAB2nb,SHOM_STAB_Total,SOTH_STAB_Total)~1
+    cat("PARCELED MODEL NB SEPERATE NO COVARIATES NO CISHETERO:", ModelNum, "\n") 
+    for(i in 2:6){
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model19Best <- LCA_best_model
+  }
+  if (ModelNum == 20) {
+    f <- cbind(TG_Real_Total,REALnb,SHOM_Real_Total,SOTH_Real_Total,
+               TG_EVAL_Total,EVALnb,SHOM_EVAL_Total,SOTH_EVAL_Total,
+               TG_STAB_Total,STAB1nb,STAB2nb,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
+    cat("PARCELED MODEL NB SEPERATE WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
+    for(i in 2:6){
+      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
+                  tol=1e-5, na.rm=FALSE,  
+                  nrep=5, verbose=TRUE, calc.se=FALSE)
+      if(lc$bic < min_bic){
+        min_bic <- lc$bic
+        LCA_best_model<-lc
+      }
+    } 
+    Model20Best <- LCA_best_model
+  }
+  ModelNum <- ModelNum + 1
+}
+sink(file = NULL)
+
+sink(file = "models_9-20_best_performance.txt")
+Model9Best
+Model10Best
+Model11Best
+Model12Best
+Model13Best
+Model14Best
+Model15Best
+Model16Best
+Model17Best
+Model18Best
+Model19Best
+Model20Best
+sink(file = NULL)
+
 # Visualize data 
 NFC_Density <- data |>
   tidyplot(x = NFC_Total, color = Study) |>
@@ -392,7 +726,6 @@ Real_SHOT_Density <- data |>
 Real_CG_Density + Real_TG_Density + Real_SHET_Density + Real_SHOM_Density + Real_SHOT_Density + plot_layout(ncol = 5, nrow = 1)
 
 # Remove data
-f <- cbind(REALcgm,REALcgw,REALtgm,REALtgw,REALnb,REALhet,REALgl,REALbi,REALpan,REALace,EVALcgm,EVALcgw,EVALtgm,EVALtgw,EVALnb,EVALhet,EVALgl,EVALbi,EVALpan,EVALace,STAB1cgm,STAB1cgw,STAB1tgm,STAB1tgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB1pan,STAB1ace,STAB2cgm,STAB2cgw,STAB2tgm,STAB2tgw,STAB2nb,STAB2het,STAB2gl,STAB2bi,STAB2pan,STAB2ace)
 rm(f)
 rm(i)
 rm(max_II)
@@ -401,6 +734,7 @@ rm(min_bic)
 rm(data)
 rm(data1)
 rm(data2)
+rm(cols)
 rm(NFC_Density)
 rm(SDO_Density)
 rm(Real_CG_Density)
