@@ -1,36 +1,30 @@
-### LCA Model Setup for Need for Dominance ###
+################################################################################
+################# LCA Model Setup for Need for Dominance #######################
+################################################################################
 
 ## Load libraries for project
 library(tidyverse)
 library(tidyplots)
 library(patchwork)
 library(poLCA)
+library(reshape2)
 #libary(poLCAParallel)
-#library(rjags)
 
 ## Load files
 setwd("~/Desktop/Projects/Github-Repos/Need-for-Dominance/scripts/r")
-Study1 <- read_csv("~/Desktop/Projects/Github-Repos/Need-for-Dominance/data_raw/NFC Study Data.csv")
-Study2 <- read_csv("~/Desktop/Projects/Github-Repos/Need-for-Dominance/data_raw/NFC Study 2 Data.csv")
+Study1 <- as_tibble(read_csv("~/Desktop/Projects/Github-Repos/Need-for-Dominance/data_raw/NFC Study Data.csv"))
+Study2 <- as_tibble(read_csv("~/Desktop/Projects/Github-Repos/Need-for-Dominance/data_raw/NFC Study 2 Data.csv"))
 
-# Initial dataframe prep
-Study1$Study <- 1
-Study1$REALtgm <- NA
-Study1$REALtgw <- NA
-Study1$REALpan <- NA
-Study1$REALace <- NA
-Study1$EVALtgm <- NA
-Study1$EVALtgw <- NA
-Study1$EVALpan <- NA
-Study1$EVALace <- NA
-Study1$STAB1tgm <- NA
-Study1$STAB1tgw <- NA
-Study1$STAB1pan <- NA
-Study1$STAB1ace <- NA
-Study1$STAB2tgm <- NA
-Study1$STAB2tgw <- NA
-Study1$STAB2pan <- NA
-Study1$STAB2ace <- NA
+################################################################################
+########################## Initial dataframe prep ##############################
+################################################################################
+Study1 <- Study1 |> add_column(Study = 1, REALtgm = NA, REALtgw = NA, 
+                               REALpan = NA, REALace = NA, EVALtgm = NA, 
+                               EVALtgw = NA, EVALpan = NA, EVALace = NA, 
+                               STAB1tgm = NA, STAB1tgw = NA, STAB1pan = NA, 
+                               STAB1ace = NA, STAB2tgm = NA, STAB2tgw = NA, 
+                               STAB2pan = NA, STAB2ace = NA)
+Study2 <- Study2 |> add_column(Study = 2)
 selection <- c(
   Study = "Study",
   NFC1 = "NFC Items_1",
@@ -108,10 +102,7 @@ selection <- c(
   Religiousness = "Religiousness",
   Education = "Education",
   Age = "Age")
-# dplyr:: is necessary to avoid namespace conflict as poLCA requires the MASS package
 Study1 <- Study1 |> dplyr::select(all_of(selection))
-
-Study2$Study <- 2
 selection <- c(
   Study = "Study",
   NFC1 = "NFC_1",
@@ -196,457 +187,121 @@ rm(Study1)
 rm(Study2)
 data$Study <- as_factor(data$Study)
 data$Lib_Con <- as_factor(data$Lib_Con)
-data$Education <- as_factor(data$Education)
+data$Education <- as.integer(data$Education)
 # Remove obvious mistakes
-data <- data[-1, ]
-data <- data[-133, ]
+data <- data[-1, ] # Invalid case
+data <- data[-133, ] # Aged 2001
 # Set eval to minimum 1 instead of 0
 #data <- data %>%
-  #mutate(across(43:52, ~ if_else(is.na(.), NA_integer_, . + 1)))
-cols <- c("EVALcgm","EVALcgw","EVALtgm","EVALtgw","EVALnb","EVALhet","EVALgl","EVALbi","EVALpan","EVALace") 
+#mutate(across(43:52, ~ if_else(is.na(.), NA_integer_, . + 1)))
+cols <- c("EVALcgm","EVALcgw","EVALtgm","EVALtgw","EVALnb","EVALhet","EVALgl",
+          "EVALbi","EVALpan","EVALace") 
 data <- data |>
-  mutate(across(all_of(cols), ~ pmax(1, ceiling(.x/10))))
+  mutate(across(all_of(cols), ~ pmax(1, ceiling(.x/15))))
+# Scoring
+data$STAB1cgm <- 8 - data$STAB1cgm
+data$STAB1cgw <- 8 - data$STAB1cgw
+data$STAB1tgm <- 8 - data$STAB1tgm
+data$STAB1tgw <- 8 - data$STAB1tgw
+data$STAB1nb <- 8 - data$STAB1nb
+data$STAB1het <- 8 - data$STAB1het
+data$STAB1gl <- 8 - data$STAB1gl
+data$STAB1bi <- 8 - data$STAB1bi
+data$STAB1pan <- 8 - data$STAB1pan
+data$STAB1ace <- 8 - data$STAB1ace
+data$NFC_Total <- rowMeans(data[ , 2:16])
+data$SDO_Total <- with(data, rowMeans(cbind(SDO1, SDO2, SDO3, SDO4, 8 - SDO5, 
+                                            8 - SDO6, 8 - SDO7, 8 - SDO8, SDO9, 
+                                            SDO10, SDO11, SDO12, 8 - SDO13, 
+                                            8 - SDO14, 8 - SDO15, 8 - SDO16)))
 # Integer conversion
 data <- data %>%
   mutate(across(33:72, ~ as.integer(as.character(.))))
-# Scoring
-data$NFC_Total <- rowMeans(data[ , 2:16])
-data$SDO_Total <- with(data, rowMeans(cbind(SDO1, SDO2, SDO3, SDO4, 8 - SDO5, 8 - SDO6, 8 - SDO7, 8 - SDO8, SDO9, SDO10, SDO11, SDO12, 8 - SDO13, 8 - SDO14, 8 - SDO15, 8 - SDO16)))
-data$CG_Real_Total <- rowSums(cbind(data$REALcgm, data$REALcgw))
-data$TG_Real_Total <- rowSums(cbind(data$REALtgm, data$REALtgw))
-data$TGNB_Real_Total <- rowSums(cbind(data$REALtgm, data$REALtgw, data$REALnb))
-data$SHOM_Real_Total <- rowSums(cbind(data$REALgl, data$REALbi))
-data$SOTH_Real_Total <- rowSums(cbind(data$REALpan, data$REALace))
-data$CG_EVAL_Total <- rowSums(cbind(data$EVALcgm, data$EVALcgw))
-data$TG_EVAL_Total <- rowSums(cbind(data$EVALtgm, data$EVALtgw))
-data$TGNB_EVAL_Total <- rowSums(cbind(data$EVALtgm, data$EVALtgw, data$EVALnb))
-data$SHOM_EVAL_Total <- rowSums(cbind(data$EVALgl, data$EVALbi))
-data$SOTH_EVAL_Total <- rowSums(cbind(data$EVALpan, data$EVALace))
-data$CG_STAB_Total <- with(data, rowSums(cbind(8 - STAB1cgm, 8 - STAB1cgw, STAB2cgm, STAB2cgw))) # For stability items reverse code the first set 
-data$TG_STAB_Total <- with(data, rowSums(cbind(8 - STAB1tgm, 8 - STAB1tgw, STAB2tgm, STAB2tgw)))
-data$TGNB_STAB_Total <- with(data, rowSums(cbind(8 - STAB1tgm, 8 - STAB1tgw, 8- STAB1nb, STAB2tgm, STAB2tgw, STAB2nb)))
-data$SHOM_STAB_Total <- with(data, rowSums(cbind(8 - STAB1gl, 8- STAB1bi,STAB2gl,STAB2bi)))
-data$SOTH_STAB_Total <- with(data, rowSums(cbind(8 - STAB1pan, 8- STAB1ace,STAB2pan,STAB2ace)))
 # Create data1 variable
 data1 <- data |>
   filter(Study == 1)
-data1 <- data |>
+data2 <- data |>
   filter(Study == 2)
+rm(cols)
 
 ################################################################################
-############################# Study 1 models ###################################
+############################# Study 1 model ###################################
 ################################################################################
-sink(file = "models_1-4_diagnostic.txt")
-ModelNum <- 1
-while(ModelNum < 5){
-  cat("CURRENT MODEL IS:", ModelNum, "\n") 
-  cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-  max_II <- -100000
-  min_bic <- 100000
-  if (ModelNum == 1) {
-    f <- cbind(REALcgm,REALcgw,REALnb,REALhet,REALgl,REALbi,EVALcgm,EVALcgw,EVALnb,EVALhet,EVALgl,EVALbi,STAB1cgm,STAB1cgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB2cgm,STAB2cgw,STAB2nb,STAB2het,STAB2gl,STAB2bi)~1
-    cat("INDIVIDUAL MODEL WITHOUT COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model1Best <- LCA_best_model
-  }
-  if (ModelNum == 2) {
-    f <- cbind(REALcgm,REALcgw,REALnb,REALhet,REALgl,REALbi,
-               EVALcgm,EVALcgw,EVALnb,EVALhet,EVALgl,EVALbi,
-               STAB1cgm,STAB1cgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,
-               STAB2cgm,STAB2cgw,STAB2nb,STAB2het,STAB2gl,STAB2bi)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("INDIVIDUAL MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model2Best <- LCA_best_model
-  }
-  if (ModelNum == 3) {
-    f <- cbind(CG_Real_Total,REALnb,REALhet,SHOM_Real_Total,
-               CG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,
-               CG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total)~1    
-    cat("PARCELED MODEL WITHOUT COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model3Best <- LCA_best_model
-  }
-  if (ModelNum == 4) {
-    f <- cbind(CG_Real_Total,REALnb,REALhet,SHOM_Real_Total,
-               CG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,
-               CG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("PARCELED MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model4Best <- LCA_best_model
-  }
-  ModelNum <- ModelNum + 1
-}
-sink(file = NULL)
-
-sink(file = "models_1-4_best_performance.txt")
-Model1Best
-Model2Best
-Model3Best
-Model4Best
-sink(file = NULL)
-
+Study1AIC <- data.frame()
+Study1BIC <- data.frame()
+max_II <- -100000
+min_bic <- 100000
+f <- cbind(REALnb,EVALnb,STAB1nb,
+           REALgl,EVALgl,STAB1gl,
+           REALbi,EVALbi,STAB1bi)~1
+for(i in 2:10){
+  lc <- poLCA(f, data1, nclass=i, maxiter=5000,
+              tol=1e-5, na.rm=FALSE,
+              nrep=10, verbose=TRUE, calc.se=FALSE)
+  Study1AIC <- rbind(Study1AIC, cbind(i, (lc$aic)))
+  Study1BIC <-rbind(Study1BIC, cbind(i, (lc$bic)))
+  if(lc$bic < min_bic){
+    min_bic <- lc$bic
+    m1 <- lc
+    }
+} 
+f <- cbind(REALnb,EVALnb,STAB1nb,
+           REALgl,EVALgl,STAB1gl,
+           REALbi,EVALbi,STAB1bi)~NFC_Total+SDO_Total + Age + Religiousness + Lib_Con
+m1c <- poLCA(f, data1, nclass=4, maxiter=5000,
+            tol=1e-5, na.rm=FALSE,
+            nrep=10, verbose=TRUE, calc.se=TRUE)
+probs.start.new <-poLCA.reorder(m1c$probs.start,order(m1c$P,decreasing=TRUE))
+m1c <- poLCA(f, data1, nclass=4, maxiter=5000,
+             tol=1e-5, na.rm=FALSE,
+             nrep=1, verbose=TRUE, calc.se=TRUE, probs.start = probs.start.new)
 
 ################################################################################
-####################### Study 1 Nocishetero models #############################
+############################# Study 2  Model ##################################
 ################################################################################
-sink(file = "models_5-8_diagnostic.txt")
-while(ModelNum < 9){
-  cat("CURRENT MODEL IS:", ModelNum, "\n") 
-  cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-  max_II <- -100000
-  min_bic <- 100000
-  if (ModelNum == 5) {
-    f <- cbind(REALnb,REALgl,REALbi,EVALnb,EVALgl,EVALbi,STAB1nb,,STAB1gl,STAB1bi,STAB2nb,STAB2gl,STAB2bi)~1
-    cat("INDIVIDUAL MODEL WITHOUT COVARIATES NO CISHET:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model5Best <- LCA_best_model
-  }
-  if (ModelNum == 6) {
-    f <- cbind(REALnb,REALgl,REALbi,
-               EVALnb,EVALgl,EVALbi,
-               STAB1nb,STAB1gl,STAB1bi,
-               STAB2nb,STAB2gl,STAB2bi)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("INDIVIDUAL MODEL WITH COVARIATES NO CISHET:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model6Best <- LCA_best_model
-  }
-  if (ModelNum == 7) {
-    f <- cbind(REALnb,SHOM_Real_Total,
-               EVALnb,SHOM_EVAL_Total,
-               STAB1nb,STAB2nb,SHOM_STAB_Total)~1    
-    cat("PARCELED MODEL WITHOUT COVARIATES NO CISHET:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model7Best <- LCA_best_model
-  }
-  if (ModelNum == 8) {
-    f <- cbind(REALnb,SHOM_Real_Total,
-               EVALnb,SHOM_EVAL_Total,
-               STAB1nb,STAB2nb,SHOM_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("PARCELED MODEL WITH COVARIATES NO CISHET:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data1, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model8Best <- LCA_best_model
-  }
-  ModelNum <- ModelNum + 1
-}
-sink(file = NULL)
+Study2AIC <- data.frame()
+Study2BIC <- data.frame()
+max_II <- -100000
+min_bic <- 100000
+f <- cbind(REALtgw,EVALtgw,STAB1tgw,
+           REALtgm,EVALtgm,STAB1tgm,
+           REALnb,EVALnb,STAB1nb,
+           REALgl,EVALgl,STAB1gl,
+           REALbi,EVALbi,STAB1bi)~1
+for(i in 2:10){
+  lc <- poLCA(f, data2, nclass=i, maxiter=5000,
+              tol=1e-5, na.rm=FALSE,
+              nrep=10, verbose=TRUE, calc.se=FALSE)
+  Study2AIC <- rbind(Study2AIC, cbind(i, (lc$aic)))
+  Study2BIC <-rbind(Study2BIC, cbind(i, (lc$bic)))
+  if(lc$bic < min_bic){
+    min_bic <- lc$bic
+    m2 <- lc
+    }
+} 
 
-sink(file = "models_5-8_best_performance.txt")
-Model5Best
-Model6Best
-Model7Best
-Model8Best
-sink(file = NULL)
+f <- cbind(REALtgw,EVALtgw,STAB1tgw,
+           REALtgm,EVALtgm,STAB1tgm,
+           REALnb,EVALnb,STAB1nb,
+           REALgl,EVALgl,STAB1gl,
+           REALbi,EVALbi,STAB1bi)~NFC_Total+SDO_Total + Age + Religiousness + Lib_Con
+m2c <- poLCA(f, data2, nclass=5, maxiter=5000,
+            tol=1e-5, na.rm=FALSE,
+            nrep=10, verbose=TRUE, calc.se=TRUE)
+probs.start.new  <-poLCA.reorder(m2c$probs.start,order(m2c$P,decreasing=TRUE))
+m2c <- poLCA(f, data2, nclass=5, maxiter=5000,
+             tol=1e-5, na.rm=FALSE,
+             nrep=1, verbose=TRUE, calc.se=TRUE, probs.start = probs.start.new)
+rm(f, i, max_II, min_bic, lc, m1, m2)
 
 ################################################################################
-############################# Study 2  Models ##################################
+############################## Data Visualization ##############################
 ################################################################################
-sink(file = "models_9-20_diagnostic.txt")
-while(ModelNum < 21){
-  cat("CURRENT MODEL IS:", ModelNum, "\n") 
-  cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-  max_II <- -100000
-  min_bic <- 100000
-  if (ModelNum == 9) {
-    f <- cbind(REALcgm,REALcgw,REALtgm,REALtgw,REALnb,REALhet,REALgl,REALbi,REALpan,REALace,
-               EVALcgm,EVALcgw,EVALtgm,EVALtgw,EVALnb,EVALhet,EVALgl,EVALbi,EVALpan,EVALace,
-               STAB1cgm,STAB1cgw,STAB1tgm,STAB1tgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
-               STAB2cgm,STAB2cgw,STAB2tgm,STAB2tgw,STAB2nb,STAB2het,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~1
-    cat("STUDY 2 - INDIVIDUAL MODEL NO COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model9Best <- LCA_best_model
-  }
-  if (ModelNum == 10) {
-    f <- cbind(REALcgm,REALcgw,REALtgm,REALtgw,REALnb,REALhet,REALgl,REALbi,REALpan,REALace,
-               EVALcgm,EVALcgw,EVALtgm,EVALtgw,EVALnb,EVALhet,EVALgl,EVALbi,EVALpan,EVALace,
-               STAB1cgm,STAB1cgw,STAB1tgm,STAB1tgw,STAB1nb,STAB1het,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
-               STAB2cgm,STAB2cgw,STAB2tgm,STAB2tgw,STAB2nb,STAB2het,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - INDIVIDUAL MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model10Best <- LCA_best_model
-  }
-  if (ModelNum == 11) {
-    f <- cbind (CG_Real_Total,TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
-                CG_EVAL_Total,TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
-                CG_STAB_Total,TGNB_STAB_Total, SHOM_STAB_Total, SOTH_STAB_Total)~1
-    cat("STUDY 2 - PARCELED MODEL NO COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model11Best <- LCA_best_model
-  } 
-  if (ModelNum == 12) {
-    f <- cbind (CG_Real_Total,TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
-                CG_EVAL_Total,TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
-                CG_STAB_Total,TGNB_STAB_Total, SHOM_STAB_Total, SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model12Best <- LCA_best_model
-  } 
-  if (ModelNum == 13) {
-    f <- cbind(CG_Real_Total,TG_Real_Total,REALnb,REALhet,SHOM_Real_Total,SOTH_Real_Total,
-               CG_EVAL_Total,TG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,SOTH_EVAL_Total,
-               CG_STAB_Total,TG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total,SOTH_STAB_Total)~1
-    cat("STUDY 2 - PARCELED MODEL NO COVARIATES NB SEPARATE:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model13Best <- LCA_best_model
-  }
-  if (ModelNum == 14) {
-    f <- cbind(CG_Real_Total,TG_Real_Total,REALnb,REALhet,SHOM_Real_Total,SOTH_Real_Total,
-               CG_EVAL_Total,TG_EVAL_Total,EVALnb,EVALhet,SHOM_EVAL_Total,SOTH_EVAL_Total,
-               CG_STAB_Total,TG_STAB_Total,STAB1nb,STAB2nb,STAB1het,STAB2het,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES NB SEPARATE:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model14Best <- LCA_best_model
-  }
-  if (ModelNum == 15) {
-    f <- cbind(REALtgm,REALtgw,REALnb,REALgl,REALbi,REALpan,REALace,
-               EVALtgm,EVALtgw,EVALnb,EVALgl,EVALbi,EVALpan,EVALace,
-               STAB1tgm,STAB1tgw,STAB1nb,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
-               STAB2tgm,STAB2tgw,STAB2nb,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~1
-    cat("STUDY 2 - INDIVIDUAL MODEL NO COVARIATES OR CISHETERO:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model15Best <- LCA_best_model
-  } 
-  if (ModelNum == 16) {
-    f <- cbind(REALtgm,REALtgw,REALnb,REALgl,REALbi,REALpan,REALace,
-               EVALtgm,EVALtgw,EVALnb,EVALgl,EVALbi,EVALpan,EVALace,
-               STAB1tgm,STAB1tgw,STAB1nb,STAB1gl,STAB1bi,STAB1pan,STAB1ace,
-               STAB2tgm,STAB2tgw,STAB2nb,STAB2gl,STAB2bi,STAB2pan,STAB2ace)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - INDIVIDUAL MODEL WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model16Best <- LCA_best_model
-  }
-  if (ModelNum == 17) {
-    f <- cbind (TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
-                TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
-                TGNB_STAB_Total,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - PARCELED MODEL NO COVARIATES OR CISHETERO:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model17Best <- LCA_best_model
-  } 
-  if (ModelNum == 18) {
-    f <- cbind (TGNB_Real_Total,SHOM_Real_Total,SOTH_Real_Total,
-                TGNB_EVAL_Total,SHOM_EVAL_Total,SOTH_EVAL_Total,
-                TGNB_STAB_Total,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("STUDY 2 - PARCELED MODEL WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
-    for(i in 2:5){
-      cat("CURRENT RUN TIME IS",Sys.time(), "\n")
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model18Best <- LCA_best_model
-  } 
-  if (ModelNum == 19) {
-    f <- cbind(TG_Real_Total,REALnb,SHOM_Real_Total,SOTH_Real_Total,
-               TG_EVAL_Total,EVALnb,SHOM_EVAL_Total,SOTH_EVAL_Total,
-               TG_STAB_Total,STAB1nb,STAB2nb,SHOM_STAB_Total,SOTH_STAB_Total)~1
-    cat("PARCELED MODEL NB SEPERATE NO COVARIATES NO CISHETERO:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model19Best <- LCA_best_model
-  }
-  if (ModelNum == 20) {
-    f <- cbind(TG_Real_Total,REALnb,SHOM_Real_Total,SOTH_Real_Total,
-               TG_EVAL_Total,EVALnb,SHOM_EVAL_Total,SOTH_EVAL_Total,
-               TG_STAB_Total,STAB1nb,STAB2nb,SHOM_STAB_Total,SOTH_STAB_Total)~NFC_Total + SDO_Total + Age + Religiousness + Education + Lib_Con
-    cat("PARCELED MODEL NB SEPERATE WITH COVARIATES NO CISHETERO:", ModelNum, "\n") 
-    for(i in 2:6){
-      lc <- poLCAParallel::poLCA(f, data2, nclass=i, maxiter=3000, 
-                  tol=1e-5, na.rm=FALSE,  
-                  nrep=5, verbose=TRUE, calc.se=FALSE)
-      if(lc$bic < min_bic){
-        min_bic <- lc$bic
-        LCA_best_model<-lc
-      }
-    } 
-    Model20Best <- LCA_best_model
-  }
-  ModelNum <- ModelNum + 1
-}
-sink(file = NULL)
 
-sink(file = "models_9-20_best_performance.txt")
-Model9Best
-Model10Best
-Model11Best
-Model12Best
-Model13Best
-Model14Best
-Model15Best
-Model16Best
-Model17Best
-Model18Best
-Model19Best
-Model20Best
-sink(file = NULL)
-
-# Visualize data 
+######################## NFC and SDO density across study ######################
 NFC_Density <- data |>
   tidyplot(x = NFC_Total, color = Study) |>
-  add_histogram(bins = 15) |>
+  add_histogram(bins = 20) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
   adjust_colors(colors_discrete_apple) |>
@@ -657,7 +312,7 @@ NFC_Density <- data |>
   adjust_title(title = "Need for Closure Density")
 SDO_Density <- data |>
   tidyplot(x = SDO_Total, color = Study) |>
-  add_histogram(bins = 15) |>
+  add_histogram(bins = 20) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
   adjust_colors(colors_discrete_apple) |>
@@ -667,8 +322,12 @@ SDO_Density <- data |>
   adjust_legend_position(position = "left") |>
   adjust_title(title = "Social Dominance Orientation Density")
 NFC_Density + SDO_Density
-Real_CG_Density <- data |>
-  tidyplot(x = CG_Real_Total, color = Study) |>
+rm(NFC_Density, SDO_Density)
+
+#################### Realness of identities across studies #####################
+
+Real_Trans_women_Density <- data |>
+  tidyplot(x = REALtgw, color = Study) |>
   add_histogram(bins = 7) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
@@ -677,9 +336,9 @@ Real_CG_Density <- data |>
   adjust_x_axis(title = "Realness Score") |>
   adjust_y_axis_title("Count") |>
   adjust_legend_position(position = "none") |>
-  adjust_title(title = "Cisgender Men & Women Density")
-Real_TG_Density <- data |>
-  tidyplot(x = TGNB_Real_Total, color = Study) |>
+  adjust_title(title = "Perceived Trans Woman Identity Realness")
+Real_Trans_men_Density <- data |>
+  tidyplot(x = REALtgm, color = Study) |>
   add_histogram(bins = 7) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
@@ -688,9 +347,9 @@ Real_TG_Density <- data |>
   adjust_x_axis(title = "Realness Score") |>
   adjust_y_axis_title("Count") |>
   adjust_legend_position(position = "none") |>
-  adjust_title(title = "Transgender Men, Women & Non-binary Density")
-Real_SHET_Density <- data |>
-  tidyplot(x = REALhet, color = Study) |>
+  adjust_title(title = "Perceived Trans Man Identity Realness")
+Real_Nonbinary_Density <- data |>
+  tidyplot(x = REALnb, color = Study) |>
   add_histogram(bins = 7) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
@@ -699,9 +358,9 @@ Real_SHET_Density <- data |>
   adjust_x_axis(title = "Realness Score") |>
   adjust_y_axis_title("Count") |>
   adjust_legend_position(position = "top") |>
-  adjust_title(title = "Heterosexuality Density")
-Real_SHOM_Density <- data |>
-  tidyplot(x = SHOM_Real_Total, color = Study) |>
+  adjust_title(title = "Perceived Nonbinary Identity Realness")
+Real_Gay_Lesbian_Density <- data |>
+  tidyplot(x = REALgl, color = Study) |>
   add_histogram(bins = 7) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
@@ -710,9 +369,9 @@ Real_SHOM_Density <- data |>
   adjust_x_axis(title = "Realness Score") |>
   adjust_y_axis_title("Count") |>
   adjust_legend_position(position = "none") |>
-  adjust_title(title = "Gay, Lesbian, and Bisexual Idenity Density")
-Real_SHOT_Density <- data |>
-  tidyplot(x = SOTH_Real_Total, color = Study) |>
+  adjust_title(title = "Perceived Gay and Lesbian Identity Realness")
+Real_Bisexual_Density <- data |>
+  tidyplot(x = REALbi, color = Study) |>
   add_histogram(bins = 7) |>
   theme_minimal_xy() |>
   adjust_size(height = NA, width = NA) |> 
@@ -721,24 +380,259 @@ Real_SHOT_Density <- data |>
   adjust_x_axis(title = "Realness Score") |>
   adjust_y_axis_title("Count") |>
   adjust_legend_position(position = "none") |>
-  adjust_title(title = "Pansexuality and Asexuality Idenity Density")
+  adjust_title(title = "Perceived Bisexual Identity Realness")
 
-Real_CG_Density + Real_TG_Density + Real_SHET_Density + Real_SHOM_Density + Real_SHOT_Density + plot_layout(ncol = 5, nrow = 1)
+Real_Trans_women_Density + Real_Trans_men_Density + Real_Nonbinary_Density + Real_Gay_Lesbian_Density + Real_Bisexual_Density + plot_layout(ncol = 5, nrow = 1)
+rm(Real_Trans_women_Density,Real_Trans_men_Density,Real_Nonbinary_Density,Real_Gay_Lesbian_Density,Real_Bisexual_Density)
 
-# Remove data
-rm(f)
-rm(i)
-rm(max_II)
-rm(ModelNum)
-rm(min_bic)
-rm(data)
-rm(data1)
-rm(data2)
-rm(cols)
-rm(NFC_Density)
-rm(SDO_Density)
-rm(Real_CG_Density)
-rm(Real_TG_Density)
-rm(Real_SHET_Density)
-rm(Real_SHOM_Density)
-rm(Real_SHOT_Density)
+################## Evaluations of identities across studies ####################
+
+EVAL_Trans_women_Density <- data |>
+  tidyplot(x = EVALtgw, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Evaluation") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Evaluations of Trans Woman Identity")
+EVAL_Trans_men_Density <- data |>
+  tidyplot(x = EVALtgm, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Evaluation") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Evaluations of Trans Man Identity")
+EVAL_Nonbinary_Density <- data |>
+  tidyplot(x = EVALnb, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Evaluation") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "top") |>
+  adjust_title(title = "Evaluations of Nonbinary Identity")
+EVAL_Gay_Lesbian_Density <- data |>
+  tidyplot(x = EVALgl, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Evaluation") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Evaluations of Gay and Lesbian Identity")
+EVAL_Bisexual_Density <- data |>
+  tidyplot(x = EVALbi, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Evaluation") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Evaluations of Bisexual Identity")
+
+EVAL_Trans_women_Density + EVAL_Trans_men_Density + EVAL_Nonbinary_Density + EVAL_Gay_Lesbian_Density + EVAL_Bisexual_Density + plot_layout(ncol = 5, nrow = 1)
+rm(EVAL_Trans_women_Density,EVAL_Trans_men_Density,EVAL_Nonbinary_Density,EVAL_Gay_Lesbian_Density,EVAL_Bisexual_Density)
+
+################### Stability of identities across studies #####################
+
+STAB_Trans_women_Density <- data |>
+  tidyplot(x = STAB1tgw, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Stability") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Perceived Identity Stability of Trans Women")
+STAB_Trans_men_Density <- data |>
+  tidyplot(x = STAB1tgm, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Stability") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Perceived Identity Stability of Trans Men")
+STAB_Nonbinary_Density <- data |>
+  tidyplot(x = STAB1nb, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Stability") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "top") |>
+  adjust_title(title = "Perceived Identity Stability of Nonbinary People")
+STAB_Gay_Lesbian_Density <- data |>
+  tidyplot(x = STAB1gl, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Stability") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Perceived Identity Stability of Gay and Lesbian People")
+STAB_Bisexual_Density <- data |>
+  tidyplot(x = STAB1bi, color = Study) |>
+  add_histogram(bins = 7) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |> 
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 16, family = "Helvetica Neue") |>
+  adjust_x_axis(title = "Stability") |>
+  adjust_y_axis_title("Count") |>
+  adjust_legend_position(position = "none") |>
+  adjust_title(title = "Perceived Identity Stability of Bisexual People")
+
+STAB_Trans_women_Density + STAB_Trans_men_Density + STAB_Nonbinary_Density + STAB_Gay_Lesbian_Density + STAB_Bisexual_Density + plot_layout(ncol = 5, nrow = 1)
+rm(STAB_Trans_women_Density,STAB_Trans_men_Density,STAB_Nonbinary_Density,STAB_Gay_Lesbian_Density,STAB_Bisexual_Density)
+
+################################################################################
+################################## Fit Plots ###################################
+################################################################################
+# Setup
+ClassComparison1 <- cbind(Study1AIC,Study1BIC$V2)
+names(ClassComparison1)<- c("Classes","AIC","BIC");ClassComparison1<-data.frame(ClassComparison1);(ClassComparison1)
+ClassComparison1 <- ClassComparison1 %>% 
+  pivot_longer(
+    cols = c("AIC",
+             "BIC"), 
+    names_to = "Fit_Indicator",
+    values_to = "Value"
+  )
+ClassComparison1$Study <- "Study 1"
+
+ClassComparison2 <- cbind(Study2AIC,Study2BIC$V2)
+names(ClassComparison2)<- c("Classes","AIC","BIC");ClassComparison2<-data.frame(ClassComparison2);(ClassComparison2)
+ClassComparison2 <- ClassComparison2 %>% 
+  pivot_longer(
+    cols = c("AIC",
+             "BIC"), 
+    names_to = "Fit_Indicator",
+    values_to = "Value"
+  )
+ClassComparison2$Study <- "Study 2"
+FitComparison <- bind_rows(ClassComparison1, ClassComparison2, .id = "Study")
+rm(Study1AIC, Study1BIC, Study2AIC, Study2BIC, ClassComparison1, ClassComparison2)
+# Plots
+FitPlot <- FitComparison |>
+  tidyplot(x = Classes, y = Value, color = Fit_Indicator) |>
+  add_data_points(size = 4) |>
+  add_line(linewidth = 1.5) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |>
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 36, family = "Helvetica Neue", face = "plain") |>
+  adjust_title("AIC & BIC Fit by Study") |>
+  adjust_x_axis_title("Class Count") |>
+  adjust_legend_title("Fit Indicator") |>
+  adjust_legend_position(position = "top") |>
+  split_plot(by = Study, axes = "all_x", axis.titles = "margins", labeller = label_both)
+FitPlot
+
+rm(FitComparison, FitPlot)
+################################################################################
+################################### LCA Plots ################################## 
+################################################################################
+
+poLCA.entropy(m1c)
+poLCA.entropy(m2c)
+
+m1probability <- melt(m1c$probs)
+m1probabilityplot <- m1probability %>%
+  mutate(
+    L1 = factor(L1, levels = unique(L1), labels = c("Realness of Nonbinary Identity", "Evaluation of Nonbinary Identity", "Stability of Nonbinary Identity","Realness of Gay and Lesbian Identity","Evaluation of Gay and Lesbian Identity", "Stability of Gay and Lesbian Identity", "Realness of Bisexual Identity", "Evaluation of Bisexual Identity", "Stability of Bisexual Identity")),
+    Var1 = factor(Var1),                    
+    Var2 = factor(Var2)                      
+  )
+Class1Plot <- m1probabilityplot |>
+  tidyplot(x = Var2, y = value, color = Var1) |>
+  add_areastack_relative(alpha = .75) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |>
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 72, family = "Helvetica Neue", face = "plain") |>
+  adjust_title("Study 1 Class Plot") |>
+  adjust_legend_title("Class") |>
+  adjust_legend_position(position = "top") |>
+  rename_x_axis_levels(new_names = c(
+    "Pr(1)" = "1",
+    "Pr(2)" = "2",
+    "Pr(3)" = "3",
+    "Pr(4)" = "4",
+    "Pr(5)" = "5",
+    "Pr(6)" = "6",
+    "Pr(7)" = "7")) |>
+  adjust_x_axis_title("Rating") |>
+  adjust_y_axis_title("Rating Probability") |>
+  rename_color_levels(new_names = c(
+    "class 1: " = "Class 1",
+    "class 2: " = "Class 2",
+    "class 3: " = "Class 3",
+    "class 4: " = "Class 4"
+  )) |>
+  split_plot(by = L1, axes = "all_x", axis.titles = "margins", scales = "fixed", ncol = 3, nrow = 3)
+
+
+m2probability <- melt(m2c$probs)
+m2probability <- m2probability %>%
+  mutate(
+    L1 = factor(L1, levels = unique(L1), labels = c("Realness of Transgender Identity (Women)", "Evaluation of Transgender Identity (Women)", "Stability of Transgender Identity (Women)","Realness of Transgender Identity (Men)", "Evaluation of Transgender Identity (Men)", "Stability of Transgender Identity (Men)","Realness of Nonbinary Identity", "Evaluation of Nonbinary Identity", "Stability of Nonbinary Identity","Realness of Gay and Lesbian Identity","Evaluation of Gay and Lesbian Identity", "Stability of Gay and Lesbian Identity", "Realness of Bisexual Identity", "Evaluation of Bisexual Identity", "Stability of Bisexual Identity")),
+    Var1 = factor(Var1),                    
+    Var2 = factor(Var2)                      
+  )
+Class2Plot <- m2probability |>
+  tidyplot(x = Var2, y = value, color = Var1) |>
+  add_areastack_relative(alpha = .75) |>
+  theme_minimal_xy() |>
+  adjust_size(height = NA, width = NA) |>
+  adjust_colors(colors_discrete_apple) |>
+  adjust_font(fontsize = 72, family = "Helvetica Neue", face = "plain") |>
+  adjust_title("Study 2 Class Plot") |>
+  adjust_legend_title("Class") |>
+  adjust_legend_position(position = "top") |>
+  rename_x_axis_levels(new_names = c(
+    "Pr(1)" = "1",
+    "Pr(2)" = "2",
+    "Pr(3)" = "3",
+    "Pr(4)" = "4",
+    "Pr(5)" = "5",
+    "Pr(6)" = "6",
+    "Pr(7)" = "7")) |>
+  adjust_x_axis_title("Rating") |>
+  adjust_y_axis_title("Rating Probability") |>
+  rename_color_levels(new_names = c(
+    "class 1: " = "Class 1",
+    "class 2: " = "Class 2",
+    "class 3: " = "Class 3",
+    "class 4: " = "Class 4",
+    "class 5: " = "Class 5"
+  )) |>
+  split_plot(by = L1, axes = "all_x", axis.titles = "margins", scales = "fixed", ncol = 3, nrow = 5)
+
+################################################################################
+################################ Remove Objects ################################
+################################################################################
+
+rm(f, i, data, data1, data2)
+
