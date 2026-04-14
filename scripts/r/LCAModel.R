@@ -290,17 +290,16 @@ f <- cbind(REALtgw,EVALtgw,STAB1tgw,
 m2c <- poLCA(f, data2, nclass=5, maxiter=5000,
             tol=1e-5, na.rm=FALSE,
             nrep=10, verbose=TRUE, calc.se=TRUE)
-probs.start.newT  <-poLCA.reorder(m2c$probs.start,order(m2c$P,decreasing = TRUE))
+probs.start.new <-poLCA.reorder(m2c$probs.start,order(m2c$P,decreasing = TRUE))
 m2c <- poLCA(f, data2, nclass=5, maxiter=5000,
              tol=1e-5, na.rm=FALSE,
-             nrep=1, verbose=TRUE, calc.se=TRUE, probs.start = probs.start.newT)
+             nrep=1, verbose=TRUE, calc.se=TRUE, probs.start = probs.start.new)
 
 rm(f, i, max_II, min_bic, lc, m1, m2, probs.start.new)
 
 ################################################################################
 ############################## Data Visualization ##############################
 ################################################################################
-
 ######################## NFC and SDO density across study ######################
 NFC_Density <- data |>
   tidyplot(x = NFC_Total, color = Study) |>
@@ -657,7 +656,6 @@ rm(Class1Plot, Class2Plot, m1probability, m2probability)
 ################################################################################
 ############################## Regression Tables ##############################
 ################################################################################
-
 ################################### Model 1 ####################################
 Model1Data <- data.frame(
   Identifier = c("Class 2/1", "Intercept", "Need for Closure", "Social Dominance Orientation", "Age", "Religiosity", "Conservative Self Identification", " ",
