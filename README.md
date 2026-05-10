@@ -1,7 +1,7 @@
 # Social Dominance Orientation and Need for Closure as Predictors for Five Classes of Beliefs and Attitudes Toward LGBTQ Identities
 
 ## Overview
-This research uses data from Valen and Burke (2025) and will be presented at VCU's psychology department's research symposium. Using two samples of participant ratings of attitudes and beliefs towards various LGBTQ identities, I created two five-class models of these attitudes and beliefs through Latent Class Analyses. 
+This research uses data from Valen and Burke (2025) and was presented at VCU's psychology department's research symposium. Using two samples of participant ratings of attitudes and beliefs towards various LGBTQ identities, I created two five-class models of these attitudes and beliefs through Latent Class Analyses. Since this was primarily exploratory, I did not preregister any hypotheses.
 
 OSF Link to Original Study: https://osf.io/h5vpb/overview
 
